@@ -78,6 +78,18 @@ public struct PuzzleMaker {
             return
         }
 
+        do {
+            let puzzleUnits = try puzzleUnits(numRows: numRows, numColumns: numColumns)
+            puzzles(puzzleUnits: puzzleUnits, completion: completion)
+        } catch {
+            completion { throw error }
+        }
+    }
+
+    public func puzzles(
+        puzzleUnits: [[PuzzleUnit?]],
+        completion: @escaping (_ throwableClosure: () throws -> [[PuzzleElement?]]) -> Void
+    ) {
         // We will print execution time
         let start = Date()
 
@@ -86,10 +98,6 @@ public struct PuzzleMaker {
 
         // Multidimensional array for final puzzle elements
         var puzzleElements = [[PuzzleElement?]](repeating: [PuzzleElement?](repeating: nil, count: numColumns), count: numRows)
-
-        // First, all puzzle units must be generated and stored somewhere
-        var puzzleUnits = [[PuzzleUnit?]](repeating: [PuzzleUnit?](repeating: nil, count: numColumns), count: numRows)
-        var puzzleUnit: PuzzleUnit?
 
         // Flag which indicates if there was a problem in generating at least one puzzle element. True means total failure and raises exception
         var invalidImageSize = false
@@ -112,63 +120,8 @@ public struct PuzzleMaker {
 
          */
 
-        let throwException = { completion { throw PuzzleMakerError.puzzleUnitUnavailable } }
-
-        func getPuzzleUnit(_ row: Int, _ col: Int) -> PuzzleUnit? {
-            if puzzleUnits.count > row - 1, row >= 0 {
-                let rows = puzzleUnits[row]
-                if rows.count > col - 1, col >= 0 {
-                    return puzzleUnits[row][col]
-                } else {
-                    return nil
-                }
-            } else {
-                return nil
-            }
-        }
-
         for row in 0 ..< numRows {
             for column in 0 ..< numColumns {
-                switch (row, column) {
-                // Cheatsheet: 0
-                case (0, 0):
-                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(forSize: puzzleUnitSize, topEdge: .flat, rightEdge: .missing, bottomEdge: .missing, leftEdge: .flat)
-                // Cheatsheet: 2
-                case let (r, c) where r == 0 && c == numColumns - 1:
-                    guard let leftNeighbor = getPuzzleUnit(r, c - 1) else { return throwException() }
-                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(forSize: puzzleUnitSize, topEdge: .flat, rightEdge: .flat, bottomEdge: .missing, leftEdge: .mirror(leftNeighbor.rightSegment))
-                // Cheatsheet: 6
-                case let (r, c) where r == numRows - 1 && c == 0:
-                    guard let topNeighbor = getPuzzleUnit(r - 1, c) else { return throwException() }
-                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(forSize: puzzleUnitSize, topEdge: .mirror(topNeighbor.bottomSegment), rightEdge: .missing, bottomEdge: .flat, leftEdge: .flat)
-                // Cheatsheet: 8
-                case let (r, c) where r == numRows - 1 && c == numColumns - 1:
-                    guard let topNeighbor = getPuzzleUnit(r - 1, c), let leftNeighbor = getPuzzleUnit(r, c - 1) else { return throwException() }
-                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(forSize: puzzleUnitSize, topEdge: .mirror(topNeighbor.bottomSegment), rightEdge: .flat, bottomEdge: .flat, leftEdge: .mirror(leftNeighbor.rightSegment))
-                // Cheatsheet: 1
-                case let (r, c) where r == 0:
-                    guard let leftNeighbor = getPuzzleUnit(r, c - 1) else { return throwException() }
-                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(forSize: puzzleUnitSize, topEdge: .flat, rightEdge: .missing, bottomEdge: .missing, leftEdge: .mirror(leftNeighbor.rightSegment))
-                // Cheatsheet: 5
-                case let (r, c) where c == numColumns - 1:
-                    guard let topNeighbor = getPuzzleUnit(r - 1, c), let leftNeighbor = getPuzzleUnit(r, c - 1) else { return throwException() }
-                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(forSize: puzzleUnitSize, topEdge: .mirror(topNeighbor.bottomSegment), rightEdge: .flat, bottomEdge: .missing, leftEdge: .mirror(leftNeighbor.rightSegment))
-                // Cheatsheet: 7
-                case let (r, c) where r == numRows - 1:
-                    guard let topNeighbor = getPuzzleUnit(r - 1, c), let leftNeighbor = getPuzzleUnit(r, c - 1) else { return throwException() }
-                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(forSize: puzzleUnitSize, topEdge: .mirror(topNeighbor.bottomSegment), rightEdge: .missing, bottomEdge: .flat, leftEdge: .mirror(leftNeighbor.rightSegment))
-                // Cheatsheet: 3
-                case let (r, c) where c == 0:
-                    guard let topNeighbor = getPuzzleUnit(r - 1, c) else { return throwException() }
-                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(forSize: puzzleUnitSize, topEdge: .mirror(topNeighbor.bottomSegment), rightEdge: .missing, bottomEdge: .missing, leftEdge: .flat)
-                // Cheatsheet: 4
-                case let (r, c):
-                    guard let topNeighbor = getPuzzleUnit(r - 1, c), let leftNeighbor = getPuzzleUnit(r, c - 1) else { return throwException() }
-                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(forSize: puzzleUnitSize, topEdge: .mirror(topNeighbor.bottomSegment), rightEdge: .missing, bottomEdge: .missing, leftEdge: .mirror(leftNeighbor.rightSegment))
-                }
-
-                puzzleUnits[row][column] = puzzleUnit
-
                 // Only operations related to core graphics should be done asynchronous
                 group.enter()
                 mainQueue.async {
@@ -190,7 +143,10 @@ public struct PuzzleMaker {
                     let leftSegmentHeight = puzzleUnit.leftSegment.outerHeight
 
                     // Visual position is how the human eye will interpret position of the puzzle on the board
-                    let visualPosition = CGPoint(x: CGFloat(column) * self.puzzleUnitSize.width, y: CGFloat(row) * self.puzzleUnitSize.height)
+                    let visualPosition = CGPoint(
+                        x: CGFloat(column) * self.puzzleUnitSize.width,
+                        y: CGFloat(row) * self.puzzleUnitSize.height
+                    )
 
                     // Real position is exact X and Y position on the board, including outer offsets
                     let realPosition = CGPoint(x: visualPosition.x - leftSegmentHeight, y: visualPosition.y - topSegmentHeight)
@@ -240,5 +196,146 @@ public struct PuzzleMaker {
                 }
             }
         }
+    }
+
+    private func puzzleUnits(numRows: Int, numColumns: Int) throws -> [[PuzzleUnit?]] {
+        // First, all puzzle units must be generated and stored somewhere
+        var puzzleUnits = [[PuzzleUnit?]](repeating: [PuzzleUnit?](repeating: nil, count: numColumns), count: numRows)
+        var puzzleUnit: PuzzleUnit?
+
+        func getPuzzleUnit(_ row: Int, _ col: Int) -> PuzzleUnit? {
+            guard
+                puzzleUnits.count > row - 1, row >= 0,
+                puzzleUnits[row].count > col - 1, col >= 0
+            else {
+                return nil
+            }
+
+            return puzzleUnits[row][col]
+        }
+
+        for row in 0 ..< numRows {
+            for column in 0 ..< numColumns {
+                switch (row, column) {
+                    // Cheatsheet: 0
+                case (0, 0):
+                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(
+                        forSize: puzzleUnitSize,
+                        topEdge: .flat,
+                        rightEdge: .missing,
+                        bottomEdge: .missing,
+                        leftEdge: .flat
+                    )
+                    // Cheatsheet: 2
+                case let (r, c) where r == 0 && c == numColumns - 1:
+                    guard let leftNeighbor = getPuzzleUnit(r, c - 1) else {
+                        throw PuzzleMakerError.puzzleUnitUnavailable
+                    }
+
+                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(
+                        forSize: puzzleUnitSize,
+                        topEdge: .flat,
+                        rightEdge: .flat,
+                        bottomEdge: .missing,
+                        leftEdge: .mirror(leftNeighbor.rightSegment)
+                    )
+                    // Cheatsheet: 6
+                case let (r, c) where r == numRows - 1 && c == 0:
+                    guard let topNeighbor = getPuzzleUnit(r - 1, c) else {
+                        throw PuzzleMakerError.puzzleUnitUnavailable
+                    }
+
+                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(
+                        forSize: puzzleUnitSize,
+                        topEdge: .mirror(topNeighbor.bottomSegment),
+                        rightEdge: .missing,
+                        bottomEdge: .flat,
+                        leftEdge: .flat
+                    )
+                    // Cheatsheet: 8
+                case let (r, c) where r == numRows - 1 && c == numColumns - 1:
+                    guard let topNeighbor = getPuzzleUnit(r - 1, c), let leftNeighbor = getPuzzleUnit(r, c - 1) else {
+                        throw PuzzleMakerError.puzzleUnitUnavailable
+                    }
+
+                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(
+                        forSize: puzzleUnitSize,
+                        topEdge: .mirror(topNeighbor.bottomSegment),
+                        rightEdge: .flat,
+                        bottomEdge: .flat,
+                        leftEdge: .mirror(leftNeighbor.rightSegment)
+                    )
+                    // Cheatsheet: 1
+                case let (r, c) where r == 0:
+                    guard let leftNeighbor = getPuzzleUnit(r, c - 1) else {
+                        throw PuzzleMakerError.puzzleUnitUnavailable
+                    }
+
+                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(
+                        forSize: puzzleUnitSize,
+                        topEdge: .flat,
+                        rightEdge: .missing,
+                        bottomEdge: .missing,
+                        leftEdge: .mirror(leftNeighbor.rightSegment)
+                    )
+                    // Cheatsheet: 5
+                case let (r, c) where c == numColumns - 1:
+                    guard let topNeighbor = getPuzzleUnit(r - 1, c), let leftNeighbor = getPuzzleUnit(r, c - 1) else {
+                        throw PuzzleMakerError.puzzleUnitUnavailable
+                    }
+
+                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(
+                        forSize: puzzleUnitSize,
+                        topEdge: .mirror(topNeighbor.bottomSegment),
+                        rightEdge: .flat,
+                        bottomEdge: .missing,
+                        leftEdge: .mirror(leftNeighbor.rightSegment)
+                    )
+                    // Cheatsheet: 7
+                case let (r, c) where r == numRows - 1:
+                    guard let topNeighbor = getPuzzleUnit(r - 1, c), let leftNeighbor = getPuzzleUnit(r, c - 1) else {
+                        throw PuzzleMakerError.puzzleUnitUnavailable
+                    }
+
+                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(
+                        forSize: puzzleUnitSize,
+                        topEdge: .mirror(topNeighbor.bottomSegment),
+                        rightEdge: .missing,
+                        bottomEdge: .flat,
+                        leftEdge: .mirror(leftNeighbor.rightSegment)
+                    )
+                    // Cheatsheet: 3
+                case let (r, c) where c == 0:
+                    guard let topNeighbor = getPuzzleUnit(r - 1, c) else {
+                        throw PuzzleMakerError.puzzleUnitUnavailable
+                    }
+
+                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(
+                        forSize: puzzleUnitSize,
+                        topEdge: .mirror(topNeighbor.bottomSegment),
+                        rightEdge: .missing,
+                        bottomEdge: .missing,
+                        leftEdge: .flat
+                    )
+                    // Cheatsheet: 4
+                case let (r, c):
+                    guard let topNeighbor = getPuzzleUnit(r - 1, c), let leftNeighbor = getPuzzleUnit(r, c - 1) else {
+                        throw PuzzleMakerError.puzzleUnitUnavailable
+                    }
+
+                    puzzleUnit = PuzzleUnitFactory.generatePuzzleUnit(
+                        forSize: puzzleUnitSize,
+                        topEdge: .mirror(topNeighbor.bottomSegment),
+                        rightEdge: .missing,
+                        bottomEdge: .missing,
+                        leftEdge: .mirror(leftNeighbor.rightSegment)
+                    )
+                }
+
+                puzzleUnits[row][column] = puzzleUnit
+            }
+        }
+
+        return puzzleUnits
     }
 }
