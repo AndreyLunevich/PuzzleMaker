@@ -50,21 +50,15 @@ public struct PuzzleUnitFactory {
 
      - returns: Complete puzzle unit with individual segments (edges) and path (concatenation of all segments)
      */
-    public static func generatePuzzleUnit(forSize size: CGSize, topEdge: PuzzleEdge, rightEdge: PuzzleEdge, bottomEdge: PuzzleEdge, leftEdge: PuzzleEdge) -> PuzzleUnit {
-        // Segments which will be held by puzzle unit and these segments will be used to generate next units
-        var topSegment: Segment!
-        var rightSegment: Segment!
-        var bottomSegment: Segment!
-        var leftSegment: Segment!
-
-        // Original segments with additional modification - rotation. Will be used to create final path
-        var topSegmentRotated: Segment! = topSegment
-        var rightSegmentRotated: Segment! = rightSegment
-        var bottomSegmentRotated: Segment! = bottomSegment
-        var leftSegmentRotated: Segment! = leftSegment
-
+    public static func generatePuzzleUnit(
+        forSize size: CGSize,
+        topEdge: PuzzleEdge,
+        rightEdge: PuzzleEdge,
+        bottomEdge: PuzzleEdge,
+        leftEdge: PuzzleEdge
+    ) -> PuzzleUnit {
         // Generating top segment
-        topSegment = segmentPattern
+        var topSegment = segmentPattern
         switch topEdge {
         case .flat:
             topSegment.makeFlat()
@@ -75,11 +69,9 @@ public struct PuzzleUnitFactory {
             segment.mirror()
             topSegment = segment
         }
-        // Top segment should never be rotated
-        topSegmentRotated = topSegment
 
         // Generating right segment
-        rightSegment = segmentPattern
+        var rightSegment = segmentPattern
         switch rightEdge {
         case .flat:
             rightSegment.makeFlat()
@@ -93,12 +85,9 @@ public struct PuzzleUnitFactory {
             segment.mirror()
             rightSegment = segment
         }
-        rightSegmentRotated = rightSegment
-        // Only one rotation is required
-        rightSegmentRotated.rotate(forYValue: size.width)
 
         // Generating bottom segment
-        bottomSegment = segmentPattern
+        var bottomSegment = segmentPattern
         switch bottomEdge {
         case .flat:
             bottomSegment.makeFlat()
@@ -112,13 +101,9 @@ public struct PuzzleUnitFactory {
             segment.mirror()
             bottomSegment = segment
         }
-        bottomSegmentRotated = bottomSegment
-        // Two rotations required
-        bottomSegmentRotated.rotate(forYValue: size.height)
-        bottomSegmentRotated.rotate(forYValue: size.width)
 
         // Generating left segment
-        leftSegment = segmentPattern
+        var leftSegment = segmentPattern
         switch leftEdge {
         case .flat:
             leftSegment.makeFlat()
@@ -129,7 +114,38 @@ public struct PuzzleUnitFactory {
             segment.mirror()
             leftSegment = segment
         }
-        leftSegmentRotated = leftSegment
+
+        return generatePuzzleUnit(
+            forSize: size,
+            topSegment: topSegment,
+            rightSegment: rightSegment,
+            bottomSegment: bottomSegment,
+            leftSegment: leftSegment
+        )
+    }
+
+    public static func generatePuzzleUnit(
+        forSize size: CGSize,
+        topSegment: Segment,
+        rightSegment: Segment,
+        bottomSegment: Segment,
+        leftSegment: Segment
+    ) -> PuzzleUnit {
+        var topSegmentRotated = topSegment
+
+        // Generating right segment
+        var rightSegmentRotated = rightSegment
+        // Only one rotation is required
+        rightSegmentRotated.rotate(forYValue: size.width)
+
+        // Generating bottom segment
+        var bottomSegmentRotated = bottomSegment
+        // Two rotations required
+        bottomSegmentRotated.rotate(forYValue: size.height)
+        bottomSegmentRotated.rotate(forYValue: size.width)
+
+        // Generating left segment
+        var leftSegmentRotated = leftSegment
         // Three rotations required
         leftSegmentRotated.rotate(forYValue: size.height)
         leftSegmentRotated.rotate(forYValue: size.height)

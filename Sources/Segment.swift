@@ -101,4 +101,8 @@ public struct Segment {
         }
         cubicBezierCurves = cubicBezierCurvesTmp
     }
+
+    public init(cubicBezierCurves: [CubicBezierCurve]) {
+        self.cubicBezierCurves = cubicBezierCurves
+    }
 }

@@ -23,4 +23,10 @@ public struct CubicBezierCurve {
 
     /// The second control point to use when computing the curve
     public let controlPoint2: CGPoint
+
+    public init(point: CGPoint, controlPoint1: CGPoint, controlPoint2: CGPoint) {
+        self.point = point
+        self.controlPoint1 = controlPoint1
+        self.controlPoint2 = controlPoint2
+    }
 }
